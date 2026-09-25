@@ -11,6 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Install Build Tools
         run: |
@@ -18,14 +19,24 @@ jobs:
 
       - name: Setup Build Directory & Compile
         run: |
-          mkdir build-ios && cd build-ios
-          cmake .. -G Xcode -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -DPLATFORM=OS64
-          xcodebuild -project Generals.xcodeproj -scheme Generals -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO
+          mkdir -p build-ios
+          cd build-ios
+          cmake .. -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_BUILD_TYPE=Release
+          xcodebuild -alltargets -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          cp -r build-ios/Release-iphoneos/Generals.app Payload/
+          APP_PATH=$(find build-ios -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file not found!"
+            exit 1
+          fi
+          cp -r "$APP_PATH" Payload/
           zip -r Generals.ipa Payload
 
       - name: Upload IPA Artifact
@@ -33,4 +44,3 @@ jobs:
         with:
           name: Generals-iOS-IPA
           path: Generals.ipa
-          
