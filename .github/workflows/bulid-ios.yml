@@ -44,7 +44,7 @@ jobs:
         with:
           name: Generals-iOS-IPA
           path: Generals.ipa
-[25/09/2026 19:00] nig 2: name: Build iOS IPA
+[25/09/2026 19:06] nig 2: name: Build iOS IPA
 
 on:
   workflow_dispatch:
@@ -66,11 +66,6 @@ jobs:
           git submodule sync --recursive
           git submodule update --init --recursive
 
-      - name: Select Xcode Version
-        run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer  sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer  true
-          xcodebuild -version
-
       - name: Install Build Dependencies
         run: |
           brew install cmake ninja pkg-config meson
@@ -78,17 +73,7 @@ jobs:
       - name: Configure CMake for iOS
         run: |
           mkdir -p build-ios
-          
-          # Check for custom iOS toolchain if present
-          TOOLCHAIN_FLAG=""
-          if [ -f "cmake/ios.toolchain.cmake" ]; then
-            TOOLCHAIN_FLAG="-DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake"
-          elif [ -f "ios.toolchain.cmake" ]; then
-            TOOLCHAIN_FLAG="-DCMAKE_TOOLCHAIN_FILE=ios.toolchain.cmake"
-          fi
-
           cmake -S . -B build-ios -G Xcode \
-            $TOOLCHAIN_FLAG \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
@@ -101,11 +86,11 @@ jobs:
 
       - name: Build iOS Project
         run: |
-          cmake --build build-ios --config Release --sdk iphoneos -- \
+          cmake --build build-ios --config Release -- \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package IPA
         run: |
@@ -115,7 +100,7 @@ jobs:
           
           if [ -z "$APP_PATH" ]; then
             echo "Error: No .app bundle found!"
-            find build-ios -maxdepth 4
+            find build-ios -maxdepth 5
             exit 1
           fi
           
