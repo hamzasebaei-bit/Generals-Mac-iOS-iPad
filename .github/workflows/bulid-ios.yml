@@ -22,7 +22,7 @@ jobs:
 
       - name: Install Build Dependencies
         run: |
-          brew install cmake ninja pkg-config meson
+          brew install cmake ninja pkg-config meson freetype libpng sdl2
 
       - name: Configure CMake for iOS
         run: |
@@ -33,6 +33,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix);$(brew --prefix freetype)" \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
