@@ -1,4 +1,4 @@
-name: Build iOS IPA
+[25/09/2026 18:41] nig 2: name: Build iOS IPA
 
 on:
   workflow_dispatch:
@@ -44,3 +44,88 @@ jobs:
         with:
           name: Generals-iOS-IPA
           path: Generals.ipa
+[25/09/2026 19:00] nig 2: name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Fix Submodule SSH URLs & Sync
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer  sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer  true
+          xcodebuild -version
+
+      - name: Install Build Dependencies
+        run: |
+          brew install cmake ninja pkg-config meson
+
+      - name: Configure CMake for iOS
+        run: |
+          mkdir -p build-ios
+          
+          # Check for custom iOS toolchain if present
+          TOOLCHAIN_FLAG=""
+          if [ -f "cmake/ios.toolchain.cmake" ]; then
+            TOOLCHAIN_FLAG="-DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake"
+          elif [ -f "ios.toolchain.cmake" ]; then
+            TOOLCHAIN_FLAG="-DCMAKE_TOOLCHAIN_FILE=ios.toolchain.cmake"
+          fi
+
+          cmake -S . -B build-ios -G Xcode \
+            $TOOLCHAIN_FLAG \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+            -DCMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE=NO
+
+      - name: Build iOS Project
+        run: |
+          cmake --build build-ios --config Release --sdk iphoneos -- \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          
+          APP_PATH=$(find build-ios -name "*.app" -type d | grep -v -i "test" | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: No .app bundle found!"
+            find build-ios -maxdepth 4
+            exit 1
+          fi
+          
+          echo "Found App Bundle at: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
+          zip -r Generals.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Generals-iOS-IPA
+          path: Generals.ipa
+          if-no-files-found: error
