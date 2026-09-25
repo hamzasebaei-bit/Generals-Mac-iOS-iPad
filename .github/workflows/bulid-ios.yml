@@ -23,7 +23,7 @@ jobs:
       - name: Install Host Build Tools
         run: |
           brew update
-          brew install cmake ninja pkgconf autoconf autoconf-archive automake libtool gperf
+          brew install cmake ninja meson pkgconf autoconf autoconf-archive automake libtool gperf
 
       - name: Setup vcpkg Environment
         run: |
