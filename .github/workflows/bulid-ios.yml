@@ -1,0 +1,36 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Build Tools
+        run: |
+          brew install cmake ninja pkg-config meson
+
+      - name: Setup Build Directory & Compile
+        run: |
+          mkdir build-ios && cd build-ios
+          cmake .. -G Xcode -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -DPLATFORM=OS64
+          xcodebuild -project Generals.xcodeproj -scheme Generals -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build-ios/Release-iphoneos/Generals.app Payload/
+          zip -r Generals.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Generals-iOS-IPA
+          path: Generals.ipa
+          
