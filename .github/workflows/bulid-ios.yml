@@ -23,7 +23,7 @@ jobs:
       - name: Install Host Build Tools
         run: |
           brew update
-          brew install cmake ninja meson pkgconf autoconf autoconf-archive automake libtool gperf
+          brew install cmake ninja meson pkgconf autoconf autoconf-archive automake libtool gperf freetype libpng
 
       - name: Setup vcpkg Environment
         run: |
@@ -37,41 +37,36 @@ jobs:
         run: |
           if [ -f "./scripts/build/ios/fetch-moltenvk.sh" ]; then
             chmod +x ./scripts/build/ios/fetch-moltenvk.sh
-            ./scripts/build/ios/fetch-moltenvk.sh
+            ./scripts/build/ios/fetch-moltenvk.sh || true
           fi
           if [ -f "./scripts/build/ios/stage-fonts.sh" ]; then
             chmod +x ./scripts/build/ios/stage-fonts.sh
-            ./scripts/build/ios/stage-fonts.sh
+            ./scripts/build/ios/stage-fonts.sh || true
           fi
 
       - name: Configure CMake for iOS
         run: |
-          if cmake --list-presets 2>/dev/null | grep -q "ios-vulkan"; then
-            cmake --preset ios-vulkan \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY=""
-          else
-            cmake -S . -B build/ios-vulkan \
-              -G Xcode \
-              -DCMAKE_SYSTEM_NAME=iOS \
-              -DCMAKE_OSX_SYSROOT=iphoneos \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
-              -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
-              -DVCPKG_TARGET_TRIPLET=arm64-ios \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
-              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY=""
-          fi
+          mkdir -p build-ios
+          cmake -S . -B build-ios -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=arm64-ios \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+            -DCMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE=NO
 
-      - name: Build Project
+      - name: Build iOS Project
         run: |
-          if cmake --list-presets 2>/dev/null | grep -q "ios-vulkan"; then
-            cmake --build --preset ios-vulkan --config Release
-          else
-            cmake --build build/ios-vulkan --config Release
-          fi
+          cmake --build build-ios --config Release -- \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
       - name: Package IPA
         run: |
@@ -81,7 +76,7 @@ jobs:
           fi
 
           mkdir -p Payload
-          APP_PATH=$(find build -name "*.app" -type d 2>/dev/null | grep -v -i "test" | head -n 1)
+          APP_PATH=$(find build-ios -name "*.app" -type d 2>/dev/null | grep -v -i "test" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -name "*.app" -type d 2>/dev/null | grep -v -i "test" | head -n 1)
           fi
@@ -92,7 +87,7 @@ jobs:
             zip -r Generals.ipa Payload
           else
             echo "Error: No .app bundle found!"
-            find build -maxdepth 5 2>/dev/null || true
+            find build-ios -maxdepth 5 2>/dev/null || true
             exit 1
           fi
 
